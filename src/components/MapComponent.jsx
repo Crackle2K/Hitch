@@ -1,18 +1,28 @@
-import { useState, useEffect } from 'react';
-import Map, { Marker, Popup } from 'react-map-gl/mapbox';
+import { useState, useEffect, useRef } from 'react';
+import Map, { Marker, Popup, NavigationControl } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-export default function MapComponent({ locations }) {
-  const [selectedLocation, setSelectedLocation] = useState(null);
+export default function MapComponent({ locations, selectedLocation, onSelectLocation }) {
+  const mapRef = useRef();
   const [userLocation, setUserLocation] = useState(null);
 
   useEffect(() => {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
       (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => {} // silently ignore if denied
+      () => {}
     );
   }, []);
+
+  useEffect(() => {
+    if (selectedLocation && mapRef.current) {
+      mapRef.current.flyTo({
+        center: [selectedLocation.lng, selectedLocation.lat],
+        zoom: 14,
+        duration: 1000,
+      });
+    }
+  }, [selectedLocation]);
 
   const initialView = userLocation
     ? { longitude: userLocation.lng, latitude: userLocation.lat, zoom: 10 }
@@ -20,33 +30,28 @@ export default function MapComponent({ locations }) {
 
   return (
     <Map
+      ref={mapRef}
       mapboxAccessToken={import.meta.env.VITE_MAPBOX_TOKEN}
       initialViewState={initialView}
-      style={{ width: '100%', height: '500px' }}
-      mapStyle="mapbox://styles/mapbox/streets-v12"
+      style={{ width: '100%', height: '100%' }}
+      mapStyle="mapbox://styles/mapbox/light-v11"
     >
-      {/* School markers */}
+      <NavigationControl position="bottom-right" showCompass={false} />
+
       {locations.map(loc => (
         <Marker
           key={loc.id}
           longitude={loc.lng}
           latitude={loc.lat}
-          onClick={() => setSelectedLocation(loc)}
-          style={{ cursor: 'pointer' }}
-        />
+          onClick={() => onSelectLocation(prev => prev?.id === loc.id ? null : loc)}
+        >
+          <div className={`school-marker ${selectedLocation?.id === loc.id ? 'active' : ''}`} />
+        </Marker>
       ))}
 
-      {/* User location marker */}
       {userLocation && (
         <Marker longitude={userLocation.lng} latitude={userLocation.lat}>
-          <div style={{
-            width: 16,
-            height: 16,
-            borderRadius: '50%',
-            background: '#4285F4',
-            border: '3px solid white',
-            boxShadow: '0 0 0 2px #4285F4',
-          }} title="Your location" />
+          <div className="user-marker" title="Your location" />
         </Marker>
       )}
 
@@ -54,11 +59,12 @@ export default function MapComponent({ locations }) {
         <Popup
           longitude={selectedLocation.lng}
           latitude={selectedLocation.lat}
-          onClose={() => setSelectedLocation(null)}
+          onClose={() => onSelectLocation(null)}
           closeOnClick={false}
           anchor="bottom"
+          offset={14}
         >
-          <p style={{ margin: 0, fontWeight: 'bold' }}>{selectedLocation.name}</p>
+          <p className="popup-name">{selectedLocation.name}</p>
         </Popup>
       )}
     </Map>
