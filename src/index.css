@@ -212,3 +212,397 @@ html, body, #root { height: 100%; }
   box-shadow: var(--shadow-sm) !important;
   overflow: hidden;
 }
+
+/* ── Peer / carpool map markers ──────────────────── */
+.peer-marker {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #7c3aed;
+  border: 2.5px solid #fff;
+  box-shadow: 0 1px 6px rgba(124,58,237,0.45);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  user-select: none;
+}
+
+.carpool-marker {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #f59e0b;
+  border: 2.5px solid #fff;
+  box-shadow: 0 1px 6px rgba(245,158,11,0.5);
+  cursor: default;
+}
+
+.carpool-marker.mine {
+  background: #10b981;
+  box-shadow: 0 1px 6px rgba(16,185,129,0.5);
+}
+
+/* ── Name-gate modal ─────────────────────────────── */
+.name-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15,23,42,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.name-modal {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 36px 32px;
+  width: 340px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: center;
+}
+
+.name-modal-icon {
+  color: var(--accent);
+  display: flex;
+  justify-content: center;
+}
+
+.name-modal-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-pri);
+}
+
+.name-modal-sub {
+  font-size: 13.5px;
+  color: var(--text-sec);
+  margin-top: -6px;
+}
+
+.name-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text-pri);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.name-input:focus {
+  border-color: var(--accent);
+}
+
+/* ── Buttons ─────────────────────────────────────── */
+.btn-primary {
+  padding: 9px 18px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-primary:hover:not(:disabled) { background: var(--accent-dk); }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-ghost {
+  padding: 9px 18px;
+  background: transparent;
+  color: var(--text-sec);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.btn-ghost:hover { background: #f8fafc; color: var(--text-pri); }
+
+.btn-danger-sm {
+  padding: 4px 10px;
+  background: transparent;
+  color: #ef4444;
+  border: 1.5px solid #fca5a5;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.btn-danger-sm:hover { background: #fef2f2; }
+
+.btn-full { width: 100%; }
+
+/* ── Sidebar tabs ────────────────────────────────── */
+.sidebar-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.sidebar-tab {
+  flex: 1;
+  padding: 12px 8px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--text-sec);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: color 0.12s, border-color 0.12s;
+  margin-bottom: -1px;
+}
+
+.sidebar-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* ── Carpool panel ───────────────────────────────── */
+.carpool-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.carpool-panel::-webkit-scrollbar { width: 4px; }
+.carpool-panel::-webkit-scrollbar-track { background: transparent; }
+.carpool-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.carpool-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+
+.form-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-sec);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.form-optional {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.form-select,
+.form-input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-family: inherit;
+  color: var(--text-pri);
+  background: var(--surface);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.form-select:focus,
+.form-input:focus { border-color: var(--accent); }
+
+.form-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.my-request-card {
+  background: #ecfdf5;
+  border: 1.5px solid #6ee7b7;
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.req-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.req-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #059669;
+}
+
+.req-school {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-pri);
+}
+
+.req-msg {
+  font-size: 12.5px;
+  color: var(--text-sec);
+  font-style: italic;
+}
+
+.carpool-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.carpool-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.carpool-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #7c3aed;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.carpool-peer-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-pri);
+}
+
+.carpool-dest {
+  font-size: 12px;
+  color: var(--text-sec);
+  margin-top: 1px;
+}
+
+.carpool-msg {
+  font-size: 12.5px;
+  color: var(--text-sec);
+  font-style: italic;
+  padding-left: 42px;
+}
+
+.empty-msg {
+  font-size: 13px;
+  color: var(--text-sec);
+  text-align: center;
+  padding: 16px 0 4px;
+}
+
+/* ── Online peers section ────────────────────────── */
+.peers-section {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.peer-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.peer-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #7c3aed;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.peer-row-name {
+  font-size: 13px;
+  color: var(--text-pri);
+  font-weight: 500;
+}
+
+/* ── Header presence badge ───────────────────────── */
+.header-presence {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.presence-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  flex-shrink: 0;
+}
+
+.presence-name {
+  font-size: 13px;
+  color: rgba(255,255,255,0.7);
+  font-weight: 500;
+}

@@ -2,18 +2,50 @@ import { useState, useEffect, useRef } from 'react';
 import Map, { Marker, Popup, NavigationControl } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-export default function MapComponent({ locations, selectedLocation, onSelectLocation }) {
+export default function MapComponent({
+  locations,
+  selectedLocation,
+  onSelectLocation,
+  onLocationChange,
+  otherUsers,
+  carpoolRequests,
+  userId,
+}) {
   const mapRef = useRef();
   const [userLocation, setUserLocation] = useState(null);
+  const [hasCentred, setHasCentred] = useState(false);
+  const onLocationChangeRef = useRef(onLocationChange);
 
+  useEffect(() => { onLocationChangeRef.current = onLocationChange; }, [onLocationChange]);
+
+  // High-accuracy continuous location tracking
   useEffect(() => {
     if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => {}
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setUserLocation(loc);
+        onLocationChangeRef.current?.(loc);
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
     );
+    return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
+  // Fly to user's precise location on first fix
+  useEffect(() => {
+    if (userLocation && mapRef.current && !hasCentred) {
+      setHasCentred(true);
+      mapRef.current.flyTo({
+        center: [userLocation.lng, userLocation.lat],
+        zoom: 15,
+        duration: 1500,
+      });
+    }
+  }, [userLocation, hasCentred]);
+
+  // Fly to selected school
   useEffect(() => {
     if (selectedLocation && mapRef.current) {
       mapRef.current.flyTo({
@@ -24,9 +56,7 @@ export default function MapComponent({ locations, selectedLocation, onSelectLoca
     }
   }, [selectedLocation]);
 
-  const initialView = userLocation
-    ? { longitude: userLocation.lng, latitude: userLocation.lat, zoom: 10 }
-    : { longitude: -79.4, latitude: 43.93, zoom: 9 };
+  const initialView = { longitude: -79.4, latitude: 43.93, zoom: 9 };
 
   return (
     <Map
@@ -38,6 +68,7 @@ export default function MapComponent({ locations, selectedLocation, onSelectLoca
     >
       <NavigationControl position="bottom-right" showCompass={false} />
 
+      {/* School markers */}
       {locations.map(loc => (
         <Marker
           key={loc.id}
@@ -49,6 +80,26 @@ export default function MapComponent({ locations, selectedLocation, onSelectLoca
         </Marker>
       ))}
 
+      {/* Carpool request pickup markers */}
+      {carpoolRequests.map(req => (
+        <Marker key={`cp-${req.id}`} longitude={req.lng} latitude={req.lat}>
+          <div
+            className={`carpool-marker${req.user_id === userId ? ' mine' : ''}`}
+            title={`${req.name} → ${req.school_name}${req.message ? `\n"${req.message}"` : ''}`}
+          />
+        </Marker>
+      ))}
+
+      {/* Other users */}
+      {otherUsers.map(user => (
+        <Marker key={user.user_id} longitude={user.lng} latitude={user.lat}>
+          <div className="peer-marker" title={user.name}>
+            {user.name[0].toUpperCase()}
+          </div>
+        </Marker>
+      ))}
+
+      {/* Current user */}
       {userLocation && (
         <Marker longitude={userLocation.lng} latitude={userLocation.lat}>
           <div className="user-marker" title="Your location" />

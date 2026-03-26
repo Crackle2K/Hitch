@@ -1,5 +1,6 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 import time
+import uuid
 
 app = Flask(__name__)
 
@@ -27,6 +28,10 @@ locations = [
     {"id": 10, "name": "Hodan Nalayeh Secondary School",     "lat": 43.8197, "lng": -79.4463},
 ]
 
+# In-memory stores (resets on server restart)
+user_locations = {}   # user_id -> {user_id, name, lat, lng, updated_at}
+carpool_requests = {} # request_id -> {id, user_id, name, lat, lng, school_id, school_name, message, created_at}
+
 @app.route('/api/locations')
 def get_locations():
     return jsonify(locations)
@@ -34,6 +39,61 @@ def get_locations():
 @app.route('/api/time')
 def get_time():
     return jsonify({"time": time.time()})
+
+# ── User presence ────────────────────────────────────────────────────────────
+
+@app.route('/api/users/location', methods=['POST'])
+def update_user_location():
+    data = request.get_json()
+    user_id = data.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'missing user_id'}), 400
+    user_locations[user_id] = {
+        'user_id': user_id,
+        'name': data.get('name', 'Anonymous'),
+        'lat': data['lat'],
+        'lng': data['lng'],
+        'updated_at': time.time(),
+    }
+    return jsonify({'ok': True})
+
+@app.route('/api/users/locations', methods=['GET'])
+def get_user_locations():
+    # Only return users active in the last 2 minutes
+    cutoff = time.time() - 120
+    active = [u for u in user_locations.values() if u['updated_at'] > cutoff]
+    return jsonify(active)
+
+# ── Carpool requests ─────────────────────────────────────────────────────────
+
+@app.route('/api/carpool/requests', methods=['GET'])
+def get_carpool_requests():
+    # Requests expire after 2 hours
+    cutoff = time.time() - 7200
+    active = [r for r in carpool_requests.values() if r['created_at'] > cutoff]
+    return jsonify(active)
+
+@app.route('/api/carpool/request', methods=['POST'])
+def create_carpool_request():
+    data = request.get_json()
+    req_id = uuid.uuid4().hex[:8]
+    carpool_requests[req_id] = {
+        'id': req_id,
+        'user_id': data['user_id'],
+        'name': data.get('name', 'Anonymous'),
+        'lat': data['lat'],
+        'lng': data['lng'],
+        'school_id': data['school_id'],
+        'school_name': data['school_name'],
+        'message': data.get('message', ''),
+        'created_at': time.time(),
+    }
+    return jsonify(carpool_requests[req_id])
+
+@app.route('/api/carpool/request/<req_id>', methods=['DELETE'])
+def cancel_carpool_request(req_id):
+    carpool_requests.pop(req_id, None)
+    return jsonify({'ok': True})
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
