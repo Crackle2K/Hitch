@@ -14,7 +14,7 @@
     "mapbox-gl": "^3.21.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "react-map-gl": "^8.1.0"
+    "react-map-gl": "^8.1.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
