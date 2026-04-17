@@ -1,8 +1,21 @@
 import { useState, useEffect } from 'react'
 import MapComponent from './components/MapComponent'
 
+const SCHOOLS = [
+  { id: 1,  name: "Dr. G.W. Williams Secondary School",    lat: 44.0046, lng: -79.4656 },
+  { id: 2,  name: "Newmarket High School",                 lat: 44.0370, lng: -79.4613 },
+  { id: 3,  name: "Huron Heights Secondary School",        lat: 44.0453, lng: -79.4858 },
+  { id: 4,  name: "Unionville High School",                lat: 43.8655, lng: -79.3246 },
+  { id: 5,  name: "Markham District High School",          lat: 43.8742, lng: -79.2612 },
+  { id: 6,  name: "Richmond Hill High School",             lat: 43.9056, lng: -79.4280 },
+  { id: 7,  name: "Maple High School",                     lat: 43.8490, lng: -79.5073 },
+  { id: 8,  name: "Stouffville District Secondary School", lat: 43.9742, lng: -79.2469 },
+  { id: 9,  name: "King City Secondary School",            lat: 43.9278, lng: -79.5237 },
+  { id: 10, name: "Hodan Nalayeh Secondary School",        lat: 43.8197, lng: -79.4463 },
+]
+
 function App() {
-  const [locations, setLocations] = useState([])
+  const [locations] = useState(SCHOOLS)
   const [selected, setSelected] = useState(null)
   const [userLocation, setUserLocation] = useState(null)
   const [otherUsers, setOtherUsers] = useState([])
@@ -21,11 +34,6 @@ function App() {
   })
   const [userName, setUserName] = useState(() => localStorage.getItem('hitch_name') || '')
   const [nameInput, setNameInput] = useState('')
-
-  // School locations
-  useEffect(() => {
-    fetch('/api/locations').then(r => r.json()).then(setLocations)
-  }, [])
 
   // Broadcast own location to server every 15 s
   useEffect(() => {

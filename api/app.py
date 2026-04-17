@@ -1,8 +1,18 @@
 from flask import Flask, jsonify, request
+from pymongo import MongoClient
+from dotenv import load_dotenv
+import os
 import time
 import uuid
 
+load_dotenv()
+
 app = Flask(__name__)
+
+client = MongoClient(os.getenv("MONGO_URI", "mongodb://localhost:27017"))
+db = client["hitch"]
+user_locations_col = db["user_locations"]
+carpool_requests_col = db["carpool_requests"]
 
 # Coordinates derived from verified school addresses (YRDSB secondary schools)
 locations = [
@@ -28,17 +38,16 @@ locations = [
     {"id": 10, "name": "Hodan Nalayeh Secondary School",     "lat": 43.8197, "lng": -79.4463},
 ]
 
-# In-memory stores (resets on server restart)
-user_locations = {}   # user_id -> {user_id, name, lat, lng, updated_at}
-carpool_requests = {} # request_id -> {id, user_id, name, lat, lng, school_id, school_name, message, created_at}
 
 @app.route('/api/locations')
 def get_locations():
     return jsonify(locations)
 
+
 @app.route('/api/time')
 def get_time():
     return jsonify({"time": time.time()})
+
 
 # ── User presence ────────────────────────────────────────────────────────────
 
@@ -48,36 +57,38 @@ def update_user_location():
     user_id = data.get('user_id')
     if not user_id:
         return jsonify({'error': 'missing user_id'}), 400
-    user_locations[user_id] = {
+    doc = {
         'user_id': user_id,
         'name': data.get('name', 'Anonymous'),
         'lat': data['lat'],
         'lng': data['lng'],
         'updated_at': time.time(),
     }
+    user_locations_col.update_one({'user_id': user_id}, {'$set': doc}, upsert=True)
     return jsonify({'ok': True})
+
 
 @app.route('/api/users/locations', methods=['GET'])
 def get_user_locations():
-    # Only return users active in the last 2 minutes
     cutoff = time.time() - 120
-    active = [u for u in user_locations.values() if u['updated_at'] > cutoff]
+    active = list(user_locations_col.find({'updated_at': {'$gt': cutoff}}, {'_id': 0}))
     return jsonify(active)
+
 
 # ── Carpool requests ─────────────────────────────────────────────────────────
 
 @app.route('/api/carpool/requests', methods=['GET'])
 def get_carpool_requests():
-    # Requests expire after 2 hours
     cutoff = time.time() - 7200
-    active = [r for r in carpool_requests.values() if r['created_at'] > cutoff]
+    active = list(carpool_requests_col.find({'created_at': {'$gt': cutoff}}, {'_id': 0}))
     return jsonify(active)
+
 
 @app.route('/api/carpool/request', methods=['POST'])
 def create_carpool_request():
     data = request.get_json()
     req_id = uuid.uuid4().hex[:8]
-    carpool_requests[req_id] = {
+    doc = {
         'id': req_id,
         'user_id': data['user_id'],
         'name': data.get('name', 'Anonymous'),
@@ -88,12 +99,16 @@ def create_carpool_request():
         'message': data.get('message', ''),
         'created_at': time.time(),
     }
-    return jsonify(carpool_requests[req_id])
+    carpool_requests_col.insert_one(doc)
+    doc.pop('_id', None)
+    return jsonify(doc)
+
 
 @app.route('/api/carpool/request/<req_id>', methods=['DELETE'])
 def cancel_carpool_request(req_id):
-    carpool_requests.pop(req_id, None)
+    carpool_requests_col.delete_one({'id': req_id})
     return jsonify({'ok': True})
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
