@@ -11,7 +11,7 @@
     "api": "cd api && ..\\venv\\Scripts\\python -m flask run"
   },
   "dependencies": {
-    "mapbox-gl": "^3.21.0",
+    "mapbox-gl": "^3.22.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-map-gl": "^8.1.1"
