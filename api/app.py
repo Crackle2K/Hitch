@@ -1,5 +1,5 @@
 from flask import Flask, jsonify, request
-from pymongo import MongoClient
+from supabase import create_client
 from dotenv import load_dotenv
 import os
 import time
@@ -15,16 +15,10 @@ app = Flask(__name__)
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-in-production")
 
-client = MongoClient(os.getenv("MONGO_URI", "mongodb://localhost:27017"))
-db = client["hitch"]
-user_locations_col = db["user_locations"]
-carpool_requests_col = db["carpool_requests"]
-users_col = db["users"]
-
-try:
-    users_col.create_index("email", unique=True)
-except Exception as e:
-    print(f"Warning: could not create users index: {e}")
+supabase = create_client(
+    os.getenv("SUPABASE_URL"),
+    os.getenv("SUPABASE_SERVICE_KEY"),
+)
 
 # Coordinates derived from verified school addresses (YRDSB secondary schools)
 locations = [
@@ -91,15 +85,18 @@ def register():
     user_id = uuid.uuid4().hex
 
     try:
-        users_col.insert_one({
+        supabase.table('users').insert({
             'user_id': user_id,
             'name': name,
             'email': email,
             'password_hash': pw_hash,
             'created_at': time.time(),
-        })
-    except Exception:
-        return jsonify({'error': 'email already registered'}), 409
+        }).execute()
+    except Exception as e:
+        if 'unique' in str(e).lower() or 'duplicate' in str(e).lower():
+            return jsonify({'error': 'email already registered'}), 409
+        print(f"Database error during register: {e}")
+        return jsonify({'error': 'service unavailable'}), 503
 
     token = jwt.encode(
         {'user_id': user_id, 'name': name, 'email': email,
@@ -115,7 +112,13 @@ def login():
     email = (data.get('email') or '').strip().lower()
     password = data.get('password') or ''
 
-    user = users_col.find_one({'email': email})
+    try:
+        result = supabase.table('users').select('*').eq('email', email).maybe_single().execute()
+        user = result.data
+    except Exception as e:
+        print(f"Database error during login: {e}")
+        return jsonify({'error': 'service unavailable'}), 503
+
     if not user or not bcrypt.checkpw(password.encode(), user['password_hash'].encode()):
         return jsonify({'error': 'invalid email or password'}), 401
 
@@ -147,14 +150,13 @@ def update_user_location():
     user_id = request.user['user_id']
     name = request.user['name']
     data = request.get_json() or {}
-    doc = {
+    supabase.table('user_locations').upsert({
         'user_id': user_id,
         'name': name,
         'lat': data['lat'],
         'lng': data['lng'],
         'updated_at': time.time(),
-    }
-    user_locations_col.update_one({'user_id': user_id}, {'$set': doc}, upsert=True)
+    }, on_conflict='user_id').execute()
     return jsonify({'ok': True})
 
 
@@ -162,8 +164,8 @@ def update_user_location():
 @require_auth
 def get_user_locations():
     cutoff = time.time() - 120
-    active = list(user_locations_col.find({'updated_at': {'$gt': cutoff}}, {'_id': 0}))
-    return jsonify(active)
+    result = supabase.table('user_locations').select('user_id,name,lat,lng,updated_at').gt('updated_at', cutoff).execute()
+    return jsonify(result.data)
 
 
 # ── Protected: carpool requests ───────────────────────────────────────────────
@@ -172,8 +174,8 @@ def get_user_locations():
 @require_auth
 def get_carpool_requests():
     cutoff = time.time() - 7200
-    active = list(carpool_requests_col.find({'created_at': {'$gt': cutoff}}, {'_id': 0}))
-    return jsonify(active)
+    result = supabase.table('carpool_requests').select('*').gt('created_at', cutoff).execute()
+    return jsonify(result.data)
 
 
 @app.route('/api/carpool/request', methods=['POST'])
@@ -194,8 +196,7 @@ def create_carpool_request():
         'message': data.get('message', ''),
         'created_at': time.time(),
     }
-    carpool_requests_col.insert_one(doc)
-    doc.pop('_id', None)
+    supabase.table('carpool_requests').insert(doc).execute()
     return jsonify(doc)
 
 
@@ -203,7 +204,7 @@ def create_carpool_request():
 @require_auth
 def cancel_carpool_request(req_id):
     user_id = request.user['user_id']
-    carpool_requests_col.delete_one({'id': req_id, 'user_id': user_id})
+    supabase.table('carpool_requests').delete().eq('id', req_id).eq('user_id', user_id).execute()
     return jsonify({'ok': True})
 
 
