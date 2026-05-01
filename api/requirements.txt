@@ -1,5 +1,5 @@
 flask
-supabase
+requests
 python-dotenv
 bcrypt
 PyJWT

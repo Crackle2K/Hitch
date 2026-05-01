@@ -1,5 +1,5 @@
 from flask import Flask, jsonify, request
-from supabase import create_client
+import requests as http
 from dotenv import load_dotenv
 import os
 import time
@@ -14,11 +14,46 @@ load_dotenv()
 app = Flask(__name__)
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-in-production")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
-supabase = create_client(
-    os.getenv("SUPABASE_URL"),
-    os.getenv("SUPABASE_SERVICE_KEY"),
-)
+def sb_headers(extra=None):
+    h = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+    }
+    if extra:
+        h.update(extra)
+    return h
+
+def sb_get(table, params=None):
+    r = http.get(f"{SUPABASE_URL}/rest/v1/{table}", headers=sb_headers(), params=params)
+    r.raise_for_status()
+    return r.json()
+
+def sb_insert(table, doc):
+    r = http.post(
+        f"{SUPABASE_URL}/rest/v1/{table}",
+        headers=sb_headers({"Prefer": "return=representation"}),
+        json=doc,
+    )
+    r.raise_for_status()
+    return r.json()
+
+def sb_upsert(table, doc, on_conflict):
+    r = http.post(
+        f"{SUPABASE_URL}/rest/v1/{table}",
+        headers=sb_headers({"Prefer": f"resolution=merge-duplicates,return=representation"}),
+        params={"on_conflict": on_conflict},
+        json=doc,
+    )
+    r.raise_for_status()
+    return r.json()
+
+def sb_delete(table, params):
+    r = http.delete(f"{SUPABASE_URL}/rest/v1/{table}", headers=sb_headers(), params=params)
+    r.raise_for_status()
 
 # Coordinates derived from verified school addresses (YRDSB secondary schools)
 locations = [
@@ -85,15 +120,15 @@ def register():
     user_id = uuid.uuid4().hex
 
     try:
-        supabase.table('users').insert({
+        sb_insert('users', {
             'user_id': user_id,
             'name': name,
             'email': email,
             'password_hash': pw_hash,
             'created_at': time.time(),
-        }).execute()
-    except Exception as e:
-        if 'unique' in str(e).lower() or 'duplicate' in str(e).lower():
+        })
+    except http.HTTPError as e:
+        if e.response is not None and e.response.status_code == 409:
             return jsonify({'error': 'email already registered'}), 409
         print(f"Database error during register: {e}")
         return jsonify({'error': 'service unavailable'}), 503
@@ -113,8 +148,8 @@ def login():
     password = data.get('password') or ''
 
     try:
-        result = supabase.table('users').select('*').eq('email', email).maybe_single().execute()
-        user = result.data
+        rows = sb_get('users', {'email': f'eq.{email}', 'select': '*'})
+        user = rows[0] if rows else None
     except Exception as e:
         print(f"Database error during login: {e}")
         return jsonify({'error': 'service unavailable'}), 503
@@ -150,13 +185,13 @@ def update_user_location():
     user_id = request.user['user_id']
     name = request.user['name']
     data = request.get_json() or {}
-    supabase.table('user_locations').upsert({
+    sb_upsert('user_locations', {
         'user_id': user_id,
         'name': name,
         'lat': data['lat'],
         'lng': data['lng'],
         'updated_at': time.time(),
-    }, on_conflict='user_id').execute()
+    }, on_conflict='user_id')
     return jsonify({'ok': True})
 
 
@@ -164,8 +199,11 @@ def update_user_location():
 @require_auth
 def get_user_locations():
     cutoff = time.time() - 120
-    result = supabase.table('user_locations').select('user_id,name,lat,lng,updated_at').gt('updated_at', cutoff).execute()
-    return jsonify(result.data)
+    rows = sb_get('user_locations', {
+        'updated_at': f'gt.{cutoff}',
+        'select': 'user_id,name,lat,lng,updated_at',
+    })
+    return jsonify(rows)
 
 
 # ── Protected: carpool requests ───────────────────────────────────────────────
@@ -174,8 +212,8 @@ def get_user_locations():
 @require_auth
 def get_carpool_requests():
     cutoff = time.time() - 7200
-    result = supabase.table('carpool_requests').select('*').gt('created_at', cutoff).execute()
-    return jsonify(result.data)
+    rows = sb_get('carpool_requests', {'created_at': f'gt.{cutoff}', 'select': '*'})
+    return jsonify(rows)
 
 
 @app.route('/api/carpool/request', methods=['POST'])
@@ -184,9 +222,8 @@ def create_carpool_request():
     user_id = request.user['user_id']
     name = request.user['name']
     data = request.get_json() or {}
-    req_id = uuid.uuid4().hex[:8]
     doc = {
-        'id': req_id,
+        'id': uuid.uuid4().hex[:8],
         'user_id': user_id,
         'name': name,
         'lat': data['lat'],
@@ -196,7 +233,7 @@ def create_carpool_request():
         'message': data.get('message', ''),
         'created_at': time.time(),
     }
-    supabase.table('carpool_requests').insert(doc).execute()
+    sb_insert('carpool_requests', doc)
     return jsonify(doc)
 
 
@@ -204,7 +241,7 @@ def create_carpool_request():
 @require_auth
 def cancel_carpool_request(req_id):
     user_id = request.user['user_id']
-    supabase.table('carpool_requests').delete().eq('id', req_id).eq('user_id', user_id).execute()
+    sb_delete('carpool_requests', {'id': f'eq.{req_id}', 'user_id': f'eq.{user_id}'})
     return jsonify({'ok': True})
 
 
